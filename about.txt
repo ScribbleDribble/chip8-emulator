@@ -1,0 +1,48 @@
+The CHIP-8 is an interpreted programming language which allowed programmers to easily make games. 
+
+Specs:
+
+Memory
+4K memory - Each of the 4096 memory locations are a byte long. The CHIP-8 interpreter occupies the first 512 bytes of memory. 
+So most programs running on this system begin at mem location 512 (0x200) and do not access anything below that. 
+The uppermost 256 bytes are reserved for display refresh and the 96 bytes below that were reserved for the call stack, internal use and other variables.
+
+Registers:
+There are 16 8-bit data registers named V0 to VF. The VF register is a flag for some instructions. In an addition operation, VF is the carry flag, while in subtraction it is the no borrow
+flag. In the draw instruction, VF is set upon pixel collision. 
+
+The address register, named I, is 12 bits wide and is used with several opcodes that involve memory operations.
+
+Stack
+The stack is only used to store return addresses when a subroutine is called. The original version allocated 48 bytes for up to 12 levels of nesting.
+
+Timers
+There are two times. They both count down at 60Hz until they reach 0.
+	- Delay timer: This timer is to be used for timing the events of games. Its value can be set and read.
+	- Sound timer. This timer is used for sound effects. When its value is nonzero, a beeping sound is made.
+
+Input
+Done using a hex keyboard; a keyboard with 16 keys ranging from 0 to F. Three opcodes are used to detect input. One skips an instruction if a specific key is pressed,
+while another does the same if a specific key is not pressed. The third waits for a key press and then stores it in one of the data registers.
+
+Graphics and sound 
+The original CHIP-8 has a display res of 64x32 pixels and color is black and white. So each pixel is either on or off.  Graphics are drawn to the screen solely by drawing sprites, which are 8 pixels wide and may be 1 to 15 pixels in height.
+
+Opcode table
+CHIP-8 has 35 opcodes, which are all two bytes long and stored in big-endian order. 
+
+Fetch 
+Read the instruction the PC is pointing at in memory. An instruction is two bytes so you will need to read two successive addresses from memory and combine the 
+values to form your 16-bit instructon. So you then increment your PC by two here!
+
+Decode
+The first nibble contains info on what type of instruction it is. Use this to form your 'case' in your switch statement 
+
+NNN: address
+NN: 8-bit constant
+N: 4-bit constant
+X and Y: 4-bit register identifier
+PC : Program Counter
+I : 16bit register (For memory address) (Similar to void pointer);
+VN: One of the 16 available variables. N may be 0 to F (hexadecimal);
+
