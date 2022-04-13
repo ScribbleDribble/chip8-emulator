@@ -13,25 +13,12 @@ void sys_loop() {
     int pc;
     
     
-    clear_display(display);
     while (1) {
         
-        switch(get_instruction_type(memory[pc])) {
-            
-            case 0:
-                
-            
-            case 1:
-                printf("run this");
-                break;
-                
-            default:
-                printf("throw exception...but there are no exceptions in C");
-                
-            
-        }
+        
+    }
     
     
-    } 
+} 
 
-}
+
