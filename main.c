@@ -1,8 +1,16 @@
 #include <stdio.h>
 #include "SDL.h"
-#include "vm.h"
 #include "display.h"
 #include "decode.h"
+#include "specifications.h"
+
+
+Chip8 init_system() {
+    Chip8 chip8;
+    chip8.i_register = 0;
+    chip8.pc = BASE_INSTRUCTION_ADDRESS;
+    return chip8;
+}
 
 int get_instruction(unsigned char high_byte, unsigned char low_byte) {
     return (high_byte << 8) | low_byte;
@@ -10,7 +18,6 @@ int get_instruction(unsigned char high_byte, unsigned char low_byte) {
 
 // returns size of the file in bytes
 unsigned char* read_code(char* file_name, int* filelen) {
-    
     
     FILE* f = fopen(file_name, "rb");
     fseek(f, 0, SEEK_END);
@@ -25,32 +32,23 @@ unsigned char* read_code(char* file_name, int* filelen) {
 }
 
 int main(int argc, char* argv[]) {
-            
-
-    _Bool display[WIDTH][HEIGHT];
-    unsigned char registers[16];
-    unsigned int memory[MEMORY_SIZE];
-    unsigned int i_register = 0;
     
-    const int base_instruction_addr = 0x200;
-    int pc = base_instruction_addr;    
-    
-    
+    Chip8 chip8 = init_system();  
 
     char* file_name = "tests/ibm_program.ch8";
-    int filelen = 0;
+    int codelen = 0;
     
-    unsigned char* code = read_code(file_name, &filelen);
+    unsigned char* code = read_code(file_name, &codelen);
     
     int i = 0;
     int instruction_count = 0;
-    while (i < filelen) {
+    while (i < codelen) {
         printf("%x\n", get_instruction(code[i], code[i+1]));
-        memory[base_instruction_addr + instruction_count] = get_instruction(code[i], code[i+1]);
+        chip8.memory[BASE_INSTRUCTION_ADDRESS + instruction_count] = get_instruction(code[i], code[i+1]);
         instruction_count++;
         i += 2;
-        
     }
+    
     
     if (SDL_Init(SDL_INIT_VIDEO) == 0) {
         SDL_Window* window = NULL;
@@ -67,23 +65,18 @@ int main(int argc, char* argv[]) {
 
                 SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
                                 
-                decode(memory[pc], display, &pc, registers, i_register);
+                decode(&chip8);
                 
-                if (pc >= base_instruction_addr + filelen)
-                {
-                    pc = base_instruction_addr;
-                }
+                if (chip8.pc >= BASE_INSTRUCTION_ADDRESS + codelen)
+                    chip8.pc = BASE_INSTRUCTION_ADDRESS;
                 
-                
-                printf("display");
                 for (int i=0; i < WIDTH; i++)
                     for (int j=0; j < HEIGHT; j++)
                     {
-                        if (display[i][j] == 1)
+                        if (chip8.display[i][j] == 1)
                             SDL_RenderDrawPoint(renderer, i, j);
                     }
                         
-                    
                 SDL_RenderPresent(renderer);
 
                 while (SDL_PollEvent(&event)) {
@@ -101,12 +94,8 @@ int main(int argc, char* argv[]) {
             SDL_DestroyWindow(window);
         }
     }
+
     SDL_Quit();
     return 0;
-
-    
-    
-    
-    return 0; 
 
 }

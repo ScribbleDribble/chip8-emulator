@@ -9,7 +9,7 @@
   * finds the instruction type and then
   * finds the appropriate decode-execute function
   */
-void decode(int instruction, _Bool display[WIDTH][HEIGHT], int* pc, unsigned char* registers, unsigned int i_register);
+void decode(Chip8* Chip8);
 
 /**
  * gets the first nibble of the 16-bit instruction, which tells us the type of instruction
@@ -32,11 +32,11 @@ int get_lower_instruction(int instruction);
  * 1 - CKS
  * 2 - RET
  */
-int decode_instruction_type_0(int lower_instruction,_Bool display[WIDTH][HEIGHT]);
+void decode_instruction_type_0(int lower_instruction,_Bool display[WIDTH][HEIGHT]);
 void decode_instruction_type_1(int lower_instruction, int* pc);
-void decode_instruction_type_6(int lower_instruction, unsigned char* registers);
-void decode_instruction_type_7(int lower_instruction, unsigned char* registers);
+void decode_instruction_type_6(int lower_instruction, unsigned char registers[16]);
+void decode_instruction_type_7(int lower_instruction, unsigned char registers[16]);
 void decode_instruction_type_A(int lower_instruction, unsigned int* i_register);
-void decode_instruction_type_D(int lower_instruction, unsigned char* registers, _Bool display[WIDTH][HEIGHT]);
+void decode_instruction_type_D(int lower_instruction, unsigned char registers[16], _Bool display[WIDTH][HEIGHT]);
 
  #endif
