@@ -15,7 +15,9 @@ typedef struct Chip8 {
     unsigned char registers[N_REGISTERS];
     unsigned int i_register;
     unsigned int pc;
-    _Bool display[WIDTH][HEIGHT];
+    _Bool display[HEIGHT][WIDTH];
+    _Bool vf;
+
 }Chip8;
 
 

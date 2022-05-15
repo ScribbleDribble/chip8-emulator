@@ -1,8 +1,8 @@
 #include "decode.h"
 #include "display.h"
 
-#define CLEAR_DISPLAY 0b000011100000
-#define RETURN_FROM_SUBROUTINE 0b000011101110
+#define CLEAR_DISPLAY 0xE0
+#define RETURN_FROM_SUBROUTINE 0xEE
 #define A 0xA
 #define D 0xD
 
@@ -10,7 +10,8 @@ void decode(Chip8* chip8) {
     const unsigned int instruction = chip8->memory[chip8->pc];
     const unsigned int instruction_type = get_instruction_type(instruction);
     int lower_instruction = get_lower_instruction(instruction);
-    printf("instruction: %x | instruction type: %i\n", instruction, instruction_type);
+    printf("instruction: %x | instruction type: %i | pc: %i\n", instruction, instruction_type, chip8->pc);
+    
 
     switch(instruction_type) {
         case 0:
@@ -18,6 +19,7 @@ void decode(Chip8* chip8) {
             break;
         case 1:
             decode_instruction_type_1(lower_instruction, &chip8->pc);
+            // to keep pc the same as we want to execute the current instruction next
             chip8->pc--;
             break;
         case 6:
@@ -30,7 +32,7 @@ void decode(Chip8* chip8) {
             decode_instruction_type_A(lower_instruction, &chip8->i_register);
             break;
         case D:
-            decode_instruction_type_D(lower_instruction, &chip8->registers, &chip8->display);
+            decode_instruction_type_D(lower_instruction, &chip8);
             break;
         default:
             break;
@@ -41,41 +43,33 @@ void decode(Chip8* chip8) {
 }
 
 int get_instruction_type(int instruction) {
-    int mask = 0b1111000000000000;
-    int shift_to_get_ms_nibble = 12;
-    return (mask & instruction) >> shift_to_get_ms_nibble;
+    return (0xF000 & instruction) >> 12;
 }
 
 
 int get_lower_instruction(int instruction) {
-     int mask = 0b0000111111111111;
-     return mask & instruction;
+     return 0x0FFF & instruction;
 }
 
 /**
  * Denoted as 'X' within opcodes 
  */
 int get_second_ms_nibble(int lower_instruction) {
-    int mask = 0b111100000000;
-    int shift_to_get_second_ms_nibble = 8;
-    return (mask & lower_instruction) >> shift_to_get_second_ms_nibble;
+    return (0x0F00 & lower_instruction) >> 8;
 }
 
 /**
  * Denoted as 'Y' within opcodes 
  */
 int get_third_ms_nibble(int lower_instruction) {
-    int mask = 0b000011110000;
-    int shift_to_get_third_ms_nibble = 4;
-    return (mask & lower_instruction) >> shift_to_get_third_ms_nibble;
+    return (0x00F0 & lower_instruction) >> 4;
 }
 
 /**
  * Denoted as 'NN within opcodes
  */
 int get_lower_byte(int lower_instruction) {
-    int mask = 0b000011111111;
-    return mask & lower_instruction;
+    return 0x00FF & lower_instruction;
 }
 
 
@@ -83,19 +77,18 @@ int get_lower_byte(int lower_instruction) {
  * Denoted as 'N'
  */
 int get_fourth_ms_nibble(int lower_instruction) {
-    int mask = 0b000000001111;
-    return mask & lower_instruction;
+    return 0x000F & lower_instruction;
     
 }
 
-void decode_instruction_type_0(int lower_instruction, _Bool display[WIDTH][HEIGHT] ) {
-     switch(lower_instruction) {
+int decode_instruction_type_0(int lower_instruction, _Bool display[HEIGHT][WIDTH]) {
+    switch(lower_instruction) {
         case CLEAR_DISPLAY:
             clear_display(display);
-            break;
+            return 1;
 
         case RETURN_FROM_SUBROUTINE:
-            break;
+            return 2;
         
         default:
             break;
@@ -122,14 +115,24 @@ void decode_instruction_type_A(int lower_instruction, unsigned int* i_register) 
     *i_register = lower_instruction;
 }
 
-void decode_instruction_type_D(int lower_instruction, unsigned char registers[N_REGISTERS], _Bool display[WIDTH][HEIGHT]) {
-	
+void decode_instruction_type_D(int lower_instruction, Chip8* chip8) {
+
     int register_vx = get_second_ms_nibble(lower_instruction);
     int register_vy = get_third_ms_nibble(lower_instruction);
     
     int sprite_height = get_fourth_ms_nibble(lower_instruction);
-    char x = registers[register_vx];
-    char y = registers[register_vy];
-    
-    draw(x, y, sprite_height, display);
+
+    uint8_t row_detail[sprite_height];
+
+    for (int i = 0; i < sprite_height; ++i)
+    {
+        row_detail[i] = chip8->memory[chip8->i_register + i];
+    }
+
+    chip8->vf = 0;
+
+    uint8_t x = (uint8_t) chip8->registers[register_vx] % (WIDTH-1);
+    uint8_t y = (uint8_t) chip8->registers[register_vy] % (HEIGHT-1);
+
+    draw(x, y, sprite_height, &chip8->display, row_detail, &chip8->vf);
 }

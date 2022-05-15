@@ -9,6 +9,7 @@ Chip8 init_system() {
     Chip8 chip8;
     chip8.i_register = 0;
     chip8.pc = BASE_INSTRUCTION_ADDRESS;
+    chip8.vf = 0;
     return chip8;
 }
 
@@ -43,8 +44,8 @@ int main(int argc, char* argv[]) {
     int i = 0;
     int instruction_count = 0;
     while (i < codelen) {
-        printf("%x\n", get_instruction(code[i], code[i+1]));
-        chip8.memory[BASE_INSTRUCTION_ADDRESS + instruction_count] = get_instruction(code[i], code[i+1]);
+        printf("%x\n", get_instruction(code[i+1], code[i]));
+        chip8.memory[BASE_INSTRUCTION_ADDRESS + instruction_count] = get_instruction(code[i+1], code[i]);
         instruction_count++;
         i += 2;
     }
@@ -67,14 +68,16 @@ int main(int argc, char* argv[]) {
                                 
                 decode(&chip8);
                 
-                if (chip8.pc >= BASE_INSTRUCTION_ADDRESS + codelen)
+                if (chip8.pc >= 4096){
+                    printf("%i", chip8.pc);
                     chip8.pc = BASE_INSTRUCTION_ADDRESS;
-                
-                for (int i=0; i < WIDTH; i++)
-                    for (int j=0; j < HEIGHT; j++)
+                    break;
+                }
+                for (int j=0; j < HEIGHT; j++)
+                    for (int i=0; i < WIDTH; i++)
                     {
-                        if (chip8.display[i][j] == 1)
-                            SDL_RenderDrawPoint(renderer, i, j);
+                        if (chip8.display[j][i] == 1)
+                            SDL_RenderDrawPoint(renderer, j, i);
                     }
                         
                 SDL_RenderPresent(renderer);

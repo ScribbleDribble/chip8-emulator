@@ -66,4 +66,5 @@ Makefile
 *.stash 
 *.swp
 *decode_tests
+build/*
 chip8
