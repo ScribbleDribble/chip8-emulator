@@ -2,7 +2,9 @@
 #include "SDL.h"
 #include "display.h"
 #include "decode.h"
+#include "helpers.h"
 #include "specifications.h"
+#include <stdlib.h>
 
 
 Chip8 init_system() {
@@ -13,24 +15,45 @@ Chip8 init_system() {
     return chip8;
 }
 
-int get_instruction(unsigned char high_byte, unsigned char low_byte) {
-    return (high_byte << 8) | low_byte;
-}
 
-// returns size of the file in bytes
+
 unsigned char* read_code(char* file_name, int* filelen) {
     
-    FILE* f = fopen(file_name, "rb");
+    FILE* f = fopen(file_name, "r");
+
+    if (f == NULL) {
+        fprintf(stderr, "Could not open file. Exiting program.");
+        exit(0);
+    }
     fseek(f, 0, SEEK_END);
     *filelen = ftell(f);
     rewind(f);
     
     unsigned char* code = (unsigned char *)malloc(*filelen*sizeof(unsigned char));
     fread(code, *filelen, 1, f);
+
+
+
+    // int i = 0;
+    // char c = fgetc(f);
+    // while (c != EOF) {
+    //     // printf("%x\n", (unsigned char) c);
+    //     printf("%i\n", i++);
+    //     code[(*filelen)++] = c;
+    //     c = fgetc(f);
+    //     code = (unsigned char *) realloc(code, (*filelen)+1);
+    // }
+
+
     fclose(f);
     
     return code;
 }
+
+uint16_t get_instruction2(unsigned char low_byte, unsigned char high_byte) {
+    return (high_byte << 8) | low_byte;
+}
+
 
 int main(int argc, char* argv[]) {
     
@@ -44,13 +67,13 @@ int main(int argc, char* argv[]) {
     int i = 0;
     int instruction_count = 0;
     while (i < codelen) {
-        printf("%x\n", get_instruction(code[i+1], code[i]));
-        chip8.memory[BASE_INSTRUCTION_ADDRESS + instruction_count] = get_instruction(code[i+1], code[i]);
+        printf("%x\n", code[i]);
+        chip8.memory[BASE_INSTRUCTION_ADDRESS + instruction_count] = code[i++];
         instruction_count++;
-        i += 2;
     }
-    
-    
+
+    print_memory(&chip8, codelen);
+    // exit(0);
     if (SDL_Init(SDL_INIT_VIDEO) == 0) {
         SDL_Window* window = NULL;
         SDL_Renderer* renderer = NULL;
@@ -68,11 +91,12 @@ int main(int argc, char* argv[]) {
                                 
                 decode(&chip8);
                 
-                if (chip8.pc >= 4096){
-                    printf("%i", chip8.pc);
+                if (chip8.pc >= codelen+BASE_INSTRUCTION_ADDRESS){
+                    // printf("%i\n", codelen);
                     chip8.pc = BASE_INSTRUCTION_ADDRESS;
-                    break;
+                    
                 }
+
                 for (int j=0; j < HEIGHT; j++)
                     for (int i=0; i < WIDTH; i++)
                     {
@@ -97,6 +121,8 @@ int main(int argc, char* argv[]) {
             SDL_DestroyWindow(window);
         }
     }
+
+    free(code);
 
     SDL_Quit();
     return 0;

@@ -20,3 +20,16 @@ char* print_n_bits_int(int x, int n) {
     printf("%s\n", bit_string);
     return bit_string;
 }
+
+void print_memory(Chip8* chip8, const int program_length) {
+    printf("%i", program_length);
+    int i;
+    for (i = 512; i < 512+program_length; i++) {
+        printf("i: %i\n", i);
+        printf("address: %u\n", i);
+        print_n_bits_int(chip8->memory[i], 8);
+        printf("%x\n", chip8->memory[i]);
+        printf("-------------------\n");
+    }
+    
+}

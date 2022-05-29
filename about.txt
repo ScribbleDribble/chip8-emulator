@@ -46,3 +46,4 @@ PC : Program Counter
 I : 16bit register (For memory address) (Similar to void pointer);
 VN: One of the 16 available variables. N may be 0 to F (hexadecimal);
 
+// cat tests/ibm_program.ch8 | dd conv=swab | od -t x2

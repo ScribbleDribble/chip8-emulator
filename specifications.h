@@ -11,7 +11,7 @@
 
 typedef struct Chip8 {
 
-    unsigned int memory[MEMORY_SIZE];
+    uint8_t memory[MEMORY_SIZE];
     unsigned char registers[N_REGISTERS];
     unsigned int i_register;
     unsigned int pc;

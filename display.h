@@ -8,6 +8,9 @@
 
 #define DISPLAY_SIZE 2048
 #define SPRITE_WIDTH 8
+#define FONT_START 050
+#define FONT_END 09F
+
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
 
