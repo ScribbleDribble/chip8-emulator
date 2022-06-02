@@ -9,78 +9,108 @@ extern "C" {
 
 }
 
-TEST(test_instruction_type, examples) {
-    int instruction = 0b0100100111000001;
-    int expected_instruction_type = 4;
-    ASSERT_EQ(get_instruction_type(instruction), expected_instruction_type);
-}
-
-TEST(test_get_truncated_instruction, examples) {
+TEST(test_get_NNN_from_instruction, examples) {
     int instruction = 0xf1da;
     int expected_truncated_instruction = 0x1da;
     ASSERT_EQ(expected_truncated_instruction, NNN(instruction));
 }
 
-TEST(test_get_lower_byte, examples) {
-    int truncated_instruction = 0x2AB;
-    int result = get_lower_byte(truncated_instruction);
+TEST(test_get_NN_from_instruction, examples) {
+    int instruction = 0x02AB;
     int expected_result = 0xAB;
 
-    ASSERT_EQ(expected_result, result);
+    ASSERT_EQ(expected_result, NN(instruction));
 }
 
 TEST(test_decode_0, examples) {
-    int lower_call_instruction = 0xE0;
-    int expected_instruction = 1;
+    int instruction = 0x00E0;
+    int expected_result = 1;
 
-    _Bool fake_display[HEIGHT][WIDTH];
+    Chip8 chip8;
     
-    ASSERT_EQ(decode_instruction_type_0(lower_call_instruction, fake_display), expected_instruction);
+    ASSERT_EQ(decode_instruction_type_0(&chip8, instruction), expected_result);
     
-    int lower_cls_instruction = 0xEE;
-    expected_instruction = 2;
-    ASSERT_EQ(decode_instruction_type_0(lower_cls_instruction, fake_display), expected_instruction);
+    instruction = 0x00EE;
+    chip8.stack[2] = 0xAB;
+    chip8.stack[1] = 0xDA;
+    chip8.sp = 2;
     
-    // int lower_return_instruction = 0b000011101110;
-    // expected_instruction = 2;
-    // ASSERT_EQ(decode_instruction_type_0(lower_return_instruction, fake_display), expected_instruction);
+    decode_instruction_type_0(&chip8, instruction);
+    
+    ASSERT_EQ(chip8.stack[2], 0);
+    ASSERT_EQ(chip8.pc, 0xAB);
+    ASSERT_EQ(chip8.sp, 1);
     
 }
 
 TEST(test_decode_1, examples) {
-    int pc = 0x0000;
-    int truncated_instruction = 0x30;
+    int instruction = 0x1300;
+    Chip8 chip8;
     
-    decode_instruction_type_1(truncated_instruction, &pc);
+    decode_instruction_type_1(&chip8, instruction);
+
+    ASSERT_EQ(chip8.pc, 0x300-2);
+}
+
+TEST(test_decode_2, examples) {
+    Chip8 chip8;
+    chip8.sp = 0;
+    const uint16_t instruction = 0x1EEE;
+    const uint16_t instruction2 = 0x1ABC;
     
-    ASSERT_EQ(pc, truncated_instruction);
+    decode_instruction_type_2(&chip8, instruction);
+    ASSERT_EQ(chip8.sp, 1);
+
+    // decode() will increment the pc by two 
+    chip8.pc += 2;
+
+    decode_instruction_type_2(&chip8, instruction2);
+    ASSERT_EQ(chip8.sp, 2);
+    ASSERT_EQ(chip8.stack[chip8.sp], 0xEEE);
+    ASSERT_EQ(chip8.pc, 0xABC-2);
+}
+
+TEST (test_decode_5, examples) {
+    Chip8 chip8;
+
+
+    chip8.pc = BASE_INSTRUCTION_ADDRESS;
+    chip8.registers[1] = 5;
+    chip8.registers[2] = 5;
+    const uint16_t instruction = 0x5120;
+
+    decode_instruction_type_5(&chip8, instruction);
+
+    ASSERT_EQ(BASE_INSTRUCTION_ADDRESS+2, chip8.pc);
+
 }
 
 TEST(test_decode_6, examples) {
-    unsigned char registers[16];
-    int truncated_instruction = 0b011000001010;
+    Chip8 chip8;
+    const uint16_t instruction = 0x6A06;
     
-    decode_instruction_type_6(truncated_instruction, registers);
-    ASSERT_EQ(registers[6], 0xA);
+    decode_instruction_type_6(&chip8, instruction);
+    ASSERT_EQ(chip8.registers[0xA], 6);
 }
 
 TEST(test_decode_7, examples) {
-    unsigned char registers[16];
-    registers[6] = 8;
+    Chip8 chip8;
+    chip8.registers[0] = 5;
+
+    const uint16_t instruction = 0x6005;
     
-    int truncated_instruction = 0b011000000010;
-    
-    decode_instruction_type_7(truncated_instruction, registers);
-    ASSERT_EQ(registers[6], 10);
+    decode_instruction_type_7(&chip8, instruction);
+    ASSERT_EQ(chip8.registers[0], 0xA);
 }
 
 TEST(test_decode_A, examples) {
-    unsigned int i_register = 0x0000;
-    int truncated_instruction = 0x30;
+    Chip8 chip8;
+    chip8.i_register = 0;
+    int instruction = 0xA100;
     
-    decode_instruction_type_A(truncated_instruction, &i_register);
+    decode_instruction_type_A(&chip8, instruction);
     
-    ASSERT_EQ(i_register, truncated_instruction);
+    ASSERT_EQ(chip8.i_register, 0x100);
 }
 
 TEST(test_decode_D, examples) {
@@ -89,7 +119,7 @@ TEST(test_decode_D, examples) {
     chip8.i_register = 5;
     clear_display(chip8.display);
     
-    unsigned int truncated_instruction = 0x01f;
+    uint16_t instruction = 0xD01F;
     // lower instruction is composed of XYN 
     int X = 0;
     int Y = 1;
@@ -115,7 +145,7 @@ TEST(test_decode_D, examples) {
         for (i = x; i < x+8; ++i)
             (i-x < (sprite_row_length/2)) ? expected_display[j][i] = 1 : expected_display[j][i] = 0;   
 
-    decode_instruction_type_D(truncated_instruction, &chip8);
+    decode_instruction_type_D(&chip8, instruction);
 
     for (j = 0; j < HEIGHT; ++j)
         for (i = 0; i < WIDTH; ++i)
@@ -127,13 +157,13 @@ TEST(test_decode_D, examples) {
 
 TEST(integration_test, example) {
     // opcodes 0xE0 0xA22A 0x600C 0x6108 0xD01F
-    unsigned char code[10] = {0x0, 0xe0, 0xa2, 0x2a, 0x60, 0xc, 0x61, 0x8, 0xd0, 0x1f};
     int code_len = 10;
+    unsigned char code[code_len] = {0x0, 0xe0, 0xa2, 0x2a, 0x60, 0xc, 0x61, 0x8, 0xd0, 0x1f};
 
-    uint8_t ram[4096];
+    uint8_t ram[MEMORY_SIZE];
     int i;
     for (i = 0; i < code_len; i++) {
-        ram[0x200 + i] = code[i];
+        ram[BASE_INSTRUCTION_ADDRESS + i] = code[i];
     }
 
     // to be pointed by bit code to draw on screen. will be pointed by i register
@@ -147,7 +177,6 @@ TEST(integration_test, example) {
     chip8.pc = BASE_INSTRUCTION_ADDRESS;
     chip8.vf = 0;
     
-
     memcpy(chip8.memory, ram, MEMORY_SIZE);
 
     int cycles = 0;
@@ -155,16 +184,15 @@ TEST(integration_test, example) {
         decode(&chip8);
         cycles++;
     }
+
     _Bool expected_display[HEIGHT][WIDTH];
 
     int j;
     int bit_code_length = 8;
     for (j = 0; j < HEIGHT; ++j){
-        printf("\n");
         for(i = 0; i < WIDTH; ++i) {
             if (j >= 8 && j < 8 + sprite_height && i >= 12 && i < 12+bit_code_length){
                 expected_display[j][i] = 1;
-                printf("%i %i\n", i, j);
             }
             else
                 expected_display[j][i] = 0;

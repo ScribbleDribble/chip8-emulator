@@ -1,49 +1,27 @@
 #include "decode.h"
 #include "display.h"
 
-#define CLEAR_DISPLAY 0xE0
-#define RETURN_FROM_SUBROUTINE 0xEE
 
 
 void decode(Chip8* chip8) {
     const unsigned int instruction = get_instruction(chip8);
+    const unsigned int instruction_type = (instruction & 0xF000) >> 12;
 
-    const unsigned int instruction_type = get_instruction_type(instruction);
-    int truncated_instruction = NNN(instruction);
     printf("instruction: %x | instruction type: %i | pc: %i\n", instruction, instruction_type, chip8->pc);
 
-    switch(instruction_type) {
-        case 0:
-            decode_instruction_type_0(truncated_instruction, chip8->display);        
-            break;
-        case 1:
-            decode_instruction_type_1(truncated_instruction, &chip8->pc);
-            // to keep pc the same as we want to execute the current instruction next
-            chip8->pc -= 2;
-            break;
-        case 6:
-            decode_instruction_type_6(truncated_instruction, chip8->registers);
-            break;
-        case 7:
-            decode_instruction_type_7(truncated_instruction, chip8->registers);
-            break;
-        case 0xA:
-            decode_instruction_type_A(truncated_instruction, &chip8->i_register);
-            break;
-        case 0xD:
-            decode_instruction_type_D(truncated_instruction, chip8);
-            break;
-        default:
-            printf("Instruction not supported");
-            break;
-    }
-    
+    void (*decode_ptr_arr[])(Chip8*, const uint16_t) = {
+        decode_instruction_type_0, decode_instruction_type_1, decode_instruction_type_2, 
+        decode_instruction_type_3, decode_instruction_type_4, decode_instruction_type_5,
+        decode_instruction_type_6, decode_instruction_type_7, decode_instruction_type_8, 
+        decode_instruction_type_9, decode_instruction_type_A, decode_instruction_type_B, 
+        decode_instruction_type_C, decode_instruction_type_D, decode_instruction_type_E, 
+        decode_instruction_type_F
+    };
+
+    (*decode_ptr_arr[instruction_type])(chip8, instruction);
+
     chip8->pc += 2;
     
-}
-
-int get_instruction_type(int instruction) {
-    return (0xF000 & instruction) >> 12;
 }
 
 uint16_t get_instruction(Chip8* chip8) {
@@ -52,43 +30,18 @@ uint16_t get_instruction(Chip8* chip8) {
     return (high_byte << 8) | low_byte;
 }
 
-/**
- * Denoted as 'X' within opcodes 
- */
-int get_second_ms_nibble(int instruction) {
-    return (0x0F00 & instruction) >> 8;
-}
+int decode_instruction_type_0(Chip8* chip8, const uint16_t instruction) {
+    int lower_12_bits = NNN(instruction);
 
-/**
- * Denoted as 'Y' within opcodes 
- */
-int get_third_ms_nibble(int instruction) {
-    return (0x00F0 & instruction) >> 4;
-}
-
-/**
- * Denoted as 'NN within opcodes
- */
-int get_lower_byte(int instruction) {
-    return 0x00FF & instruction;
-}
-
-
-/**
- * Denoted as 'N'
- */
-int get_fourth_ms_nibble(int instruction) {
-    return 0x000F & instruction;
-    
-}
-
-int decode_instruction_type_0(int truncated_instruction, _Bool display[HEIGHT][WIDTH]) {
-    switch(truncated_instruction) {
-        case 0XE0:
-            clear_display(display);
+    switch(lower_12_bits) {
+        case 0xE0:
+            clear_display(chip8->display);
             return 1;
 
-        case 0XEE:
+        case 0xEE:
+            chip8->pc = chip8->stack[chip8->sp];
+            chip8->stack[chip8->sp] = 0;
+            chip8->sp--;
             return 2;
         
         default:
@@ -97,44 +50,143 @@ int decode_instruction_type_0(int truncated_instruction, _Bool display[HEIGHT][W
 
 }
 
-void decode_instruction_type_1(int truncated_instruction, int* pc) {
-    *pc = truncated_instruction;
 
+void decode_instruction_type_1(Chip8* chip8, const uint16_t instruction) {
+    chip8->pc = NNN(instruction);
+    // the pc will increment by the end of this (and every) cycle. decrement by two to avoid advancing to the next instruction
+    chip8->pc -= 2;
 }
 
-void decode_instruction_type_6(int truncated_instruction, unsigned char registers[N_REGISTERS]) {
-    int register_vx = get_second_ms_nibble(truncated_instruction);
-    registers[register_vx] = get_lower_byte(truncated_instruction);
+void decode_instruction_type_2(Chip8* chip8, const uint16_t instruction) {
+    if (chip8->sp + 1 > MAX_STACK_DEPTH) {
+        fprintf(stderr, "Stack overflow: max stack depth of %i was exceeded\n", MAX_STACK_DEPTH);
+        exit(0);
+    }
+    chip8->sp += 1;
+    chip8->stack[chip8->sp] = chip8->pc;
+    chip8->pc = NNN(instruction) - 2;
 }
 
-void decode_instruction_type_7(int truncated_instruction, unsigned char registers[N_REGISTERS]) {
+void decode_instruction_type_3(Chip8* chip8, const uint16_t instruction) {
+    uint8_t lower_byte = NN(instruction);
+    uint8_t index = X(instruction);
+    uint8_t reg_value = chip8->registers[index];
+
+    if (reg_value == lower_byte)
+        chip8->pc += 2;
+}
+void decode_instruction_type_4(Chip8* chip8, const uint16_t instruction) {
+    uint8_t lower_byte = NN(instruction);
+    uint8_t index = X(instruction);
+    uint8_t reg_value = chip8->registers[index];
+
+    if (reg_value != lower_byte)
+        chip8->pc += 2;
+}
+void decode_instruction_type_5(Chip8* chip8, const uint16_t instruction) {
+    uint8_t index_x = X(instruction);
+    uint8_t index_y = Y(instruction);
+    uint8_t reg_value_vx = chip8->registers[index_x];
+    uint8_t reg_value_vy = chip8->registers[index_y];
+
+    if (reg_value_vx == reg_value_vy)
+        chip8->pc += 2;
+}
+
+void decode_instruction_type_6(Chip8* chip8, const uint16_t instruction) {
+    uint16_t index = X(instruction);
+    chip8->registers[index] = NN(instruction);
+}
+
+void decode_instruction_type_7(Chip8* chip8, const uint16_t instruction) {
     // TODO set carry flag if the addition will cause an overflow
-    int register_vx = get_second_ms_nibble(truncated_instruction);
-    registers[register_vx] += get_lower_byte(truncated_instruction);
+    int index = X(instruction);
+    chip8->registers[index] += NN(instruction);
 }
 
-void decode_instruction_type_A(int truncated_instruction, unsigned int* i_register) {
-    *i_register = truncated_instruction;
-}
+void decode_instruction_type_8(Chip8* chip8, const uint16_t instruction) {
+    uint8_t lowest_nibble = N(instruction); 
+    uint8_t index_x = X(instruction);
+    uint8_t index_y = Y(instruction);
+    switch(lowest_nibble) {
+        case 0:
+            chip8->registers[index_x] = chip8->registers[index_y];
+            break;
+        case 1:
+            chip8->registers[index_x] |= chip8->registers[index_y];
+            break;
+        case 2:
+            chip8->registers[index_x] &= chip8->registers[index_y];
+            break;
+        case 3:
+            chip8->registers[index_x] ^= chip8->registers[index_y];
+            break;
+        case 4:
+            chip8->registers[index_x] += chip8->registers[index_y];
+            break;
+        case 5:
+            chip8->registers[index_x] -= chip8->registers[index_y];
+            chip8->vf = chip8->registers[index_y] > chip8->registers[index_x] ? 1 : 0;
+        case 6:
+            chip8->vf = chip8->registers[index_x] & 1;
+            chip8->registers[index_x] >>= 1;
+            break;
+        case 7:
+            chip8->registers[index_x] = chip8->registers[index_y] - chip8->registers[index_x];
+            chip8->vf = chip8->registers[index_x] > chip8->registers[index_y] ? 0 : 1;
+        case 8:
+            chip8->vf = chip8->registers[index_x] & 0b10000000; 
+            chip8->registers[index_x] <<= 1;
+    }       
 
-void decode_instruction_type_D(int truncated_instruction, Chip8* chip8) {
-    int register_vx = get_second_ms_nibble(truncated_instruction);
-    int register_vy = get_third_ms_nibble(truncated_instruction);
     
-    int sprite_height = get_fourth_ms_nibble(truncated_instruction);
+}
 
-    uint8_t row_list[sprite_height];
 
-    // printf("i_reg addr: %i\nvalue pointed by i_reg: %i\n", chip8->i_register, chip8->memory[chip8->i_register]);
+void decode_instruction_type_9(Chip8* chip8, const uint16_t instruction) {
+    int index_x = X(instruction);
+    int index_y = Y(instruction);
+
+    if (chip8->registers[index_x] != chip8->registers[index_y])
+        chip8->pc += 2;
+}
+
+void decode_instruction_type_A(Chip8* chip8, uint16_t instruction) {
+    chip8->i_register = NNN(instruction);
+}
+
+
+void decode_instruction_type_B(Chip8* chip8, const uint16_t instruction) {
+
+}
+
+void decode_instruction_type_C(Chip8* chip8, const uint16_t instruction) {
+
+}
+
+void decode_instruction_type_D(Chip8* chip8, const uint16_t instruction) {
+    int index_x = X(instruction);
+    int index_y = Y(instruction);
+    
+    int sprite_height = N(instruction);
+
+    uint8_t bit_rows[sprite_height];
+
     for (int i = 0; i < sprite_height; ++i)
     {
-        row_list[i] = chip8->memory[chip8->i_register + i];
+        bit_rows[i] = chip8->memory[chip8->i_register + i];
     }
 
     chip8->vf = 0;
-    uint8_t x = (uint8_t) chip8->registers[register_vx] % (WIDTH-1);
-    uint8_t y = (uint8_t) chip8->registers[register_vy] % (HEIGHT-1);
+    uint8_t x = (uint8_t) chip8->registers[index_x] % (WIDTH-1);
+    uint8_t y = (uint8_t) chip8->registers[index_y] % (HEIGHT-1);
 
-    // printf("x: %i, y: %i, sprite height: %i\n", x, y, sprite_height);
-    draw(x, y, sprite_height, chip8->display, row_list, &chip8->vf);
+    draw(chip8, x, y, sprite_height, bit_rows);
+}
+
+void decode_instruction_type_E(Chip8* chip8, const uint16_t instruction) {
+
+}
+void decode_instruction_type_F(Chip8* chip8, const uint16_t instruction) {
+
 }
